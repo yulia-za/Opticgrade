@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OptiGrade Fisika v2</title>
+    <title>OptiGrade Fisika v2.1</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="OptiGrade">
@@ -54,11 +54,11 @@
             background: #2a2a40; color: white; border: 1px solid #3a3a50;
             padding: 10px; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 10px;
         }
-        button.btn-danger { background: rgba(255,0,0,0.2); color: #ff4444; border: 1px solid #ff4444; }
+        button.btn-danger { background: rgba(255,0,0,0.1); color: #ff4444; border: 1px solid #ff4444; }
 
         .list-card {
             background: #2a2a40; padding: 15px; border-radius: 12px; margin-bottom: 10px;
-            display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent-neon);
+            display: flex; flex-direction: column; gap: 10px; border-left: 4px solid var(--accent-neon);
         }
         
         .rubrik-soal-box {
@@ -210,7 +210,6 @@
             const saved = localStorage.getItem('optiDataV2');
             if(saved) {
                 appData = JSON.parse(saved);
-                // Migrasi data lama ke struktur baru jika perlu (fallback)
                 if(!appData.classes) appData.classes = [];
                 if(!appData.exams) appData.exams = [];
             }
@@ -252,8 +251,10 @@
             appData.classes.forEach(c => {
                 cont.innerHTML += `
                     <div class="list-card">
-                        <div><strong>${c.name}</strong><br><small>${c.students.length} Siswa</small></div>
-                        <button class="btn-secondary" style="width:auto; margin:0;" onclick="bukaEditKelas('${c.id}')">✏️ Edit Siswa</button>
+                        <div style="display:flex; justify-content: space-between; align-items: center;">
+                            <div><strong>${c.name}</strong><br><small>${c.students.length} Siswa</small></div>
+                            <button class="btn-secondary" style="width:auto; margin:0;" onclick="bukaEditKelas('${c.id}')">✏️ Edit Siswa</button>
+                        </div>
                     </div>`;
             });
         }
@@ -269,7 +270,6 @@
             const teks = document.getElementById('textarea-siswa').value;
             const namaSiswa = teks.split('\n').map(n => n.replace(/^[0-9.\-\s]+/, '').trim()).filter(n => n.length > 0);
             
-            // Pertahankan nilai siswa lama jika namanya sama, buat baru jika belum ada
             let newStudents = namaSiswa.map((nama, idx) => {
                 let exist = c.students.find(s => s.name.toLowerCase() === nama.toLowerCase());
                 return exist ? exist : { id: 's'+Date.now()+idx, name: nama, scores: {} };
@@ -282,18 +282,55 @@
         function buatUjian() {
             const nama = document.getElementById('input-nama-ujian').value.trim();
             if(!nama) return;
-            appData.exams.push({ id: Date.now().toString(), name: nama, questions: [ [] ] }); // Default 1 soal kosong
+            appData.exams.push({ id: Date.now().toString(), name: nama, questions: [ [] ] }); 
             document.getElementById('input-nama-ujian').value = "";
             saveData(); renderUjian(); updateDropdownPindai();
         }
+        
+        // FUNGSI BARU: Ganti Nama Ujian
+        function gantiNamaUjian(id) {
+            const ujian = appData.exams.find(x => x.id === id);
+            const namaBaru = prompt("Masukkan nama ujian yang baru:", ujian.name);
+            if(namaBaru !== null && namaBaru.trim() !== "") {
+                ujian.name = namaBaru.trim();
+                saveData(); renderUjian(); updateDropdownPindai();
+            }
+        }
+
+        // FUNGSI BARU: Hapus Ujian
+        function hapusUjian(id) {
+            const ujian = appData.exams.find(x => x.id === id);
+            if(confirm(`Apakah Anda yakin ingin menghapus ujian "${ujian.name}" beserta seluruh rekam nilainya?`)) {
+                // Hapus ujian dari data
+                appData.exams = appData.exams.filter(x => x.id !== id);
+                
+                // Hapus nilai ujian ini dari profil semua siswa agar tidak nyangkut
+                appData.classes.forEach(c => {
+                    c.students.forEach(s => {
+                        if(s.scores && s.scores[id]) {
+                            delete s.scores[id];
+                        }
+                    });
+                });
+                
+                saveData(); renderUjian(); updateDropdownPindai(); renderGridPindai();
+            }
+        }
+
         function renderUjian() {
             const cont = document.getElementById('daftar-ujian-container');
             cont.innerHTML = '';
             appData.exams.forEach(e => {
                 cont.innerHTML += `
                     <div class="list-card" style="border-left-color:var(--accent-pink);">
-                        <div><strong>${e.name}</strong><br><small>${e.questions.length} Soal</small></div>
-                        <button class="btn-secondary" style="width:auto; margin:0;" onclick="bukaEditUjian('${e.id}')">⚙️ Rubrik</button>
+                        <div style="display:flex; justify-content: space-between; align-items: center;">
+                            <div><strong>${e.name}</strong><br><small>${e.questions.length} Soal</small></div>
+                            <button class="btn-secondary" style="width:auto; margin:0;" onclick="bukaEditUjian('${e.id}')">⚙️ Rubrik</button>
+                        </div>
+                        <div style="display:flex; gap: 10px; margin-top: 10px;">
+                            <button class="btn-secondary" style="margin:0; font-size:0.8rem; padding: 8px;" onclick="gantiNamaUjian('${e.id}')">✏️ Ganti Nama</button>
+                            <button class="btn-secondary btn-danger" style="margin:0; font-size:0.8rem; padding: 8px;" onclick="hapusUjian('${e.id}')">🗑️ Hapus</button>
+                        </div>
                     </div>`;
             });
         }
@@ -329,7 +366,7 @@
         }
         function tambahSoal() {
             const exam = appData.exams.find(x => x.id === currentEditExamId);
-            exam.questions.push([]); // Tambah soal kosong
+            exam.questions.push([]); 
             renderSoalEditor(exam);
         }
         function simpanRubrikUjian() {
@@ -358,152 +395,4 @@
             appData.classes.forEach(c => selKelas.innerHTML += `<option value="${c.id}">${c.name}</option>`);
             
             selUjian.innerHTML = '<option value="">-- Pilih Ujian --</option>';
-            appData.exams.forEach(e => selUjian.innerHTML += `<option value="${e.id}">${e.name}</option>`);
-        }
-
-        function renderGridPindai() {
-            const cid = document.getElementById('pilih-kelas').value;
-            const eid = document.getElementById('pilih-ujian').value;
-            const cont = document.getElementById('student-container');
-            const info = document.getElementById('pindai-info');
-            
-            if(!cid || !eid) {
-                cont.classList.add('hidden'); info.classList.remove('hidden'); return;
-            }
-            
-            cont.classList.remove('hidden'); info.classList.add('hidden');
-            cont.innerHTML = '';
-            
-            const kelas = appData.classes.find(x => x.id === cid);
-            const ujian = appData.exams.find(x => x.id === eid);
-            
-            kelas.students.forEach(s => {
-                // Hitung total nilai untuk ujian ini
-                let skorTotal = 0; let adaNilai = false;
-                if(s.scores[eid]) {
-                    Object.values(s.scores[eid]).forEach(val => { skorTotal += parseInt(val); adaNilai = true; });
-                }
-                
-                const card = document.createElement('div');
-                card.className = `student-card ${adaNilai ? 'graded' : ''}`;
-                card.innerHTML = `<div style="font-weight:bold; font-size:0.9rem;">${s.name}</div>${adaNilai ? `<span class="student-score">${skorTotal}</span>` : ''}`;
-                
-                card.onclick = () => bukaModalPilihSoal(cid, eid, s.id, s.name, ujian);
-                cont.appendChild(card);
-            });
-        }
-
-        function bukaModalPilihSoal(cid, eid, sid, sname, ujian) {
-            scanState = { classId: cid, examId: eid, studentId: sid, questionIndex: null };
-            document.getElementById('nama-siswa-scan').innerText = sname;
-            
-            const btnCont = document.getElementById('tombol-soal-container');
-            btnCont.innerHTML = '';
-            
-            // Cek nilai yang sudah ada
-            const kelas = appData.classes.find(x => x.id === cid);
-            const siswa = kelas.students.find(x => x.id === sid);
-            const nilaiSiswa = siswa.scores[eid] || {};
-
-            ujian.questions.forEach((q, idx) => {
-                let nilaiTeks = nilaiSiswa[idx] !== undefined ? `(Tersimpan: ${nilaiSiswa[idx]})` : '';
-                btnCont.innerHTML += `<button class="btn-primary" onclick="picuKamera(${idx})" style="background: ${nilaiSiswa[idx] !== undefined ? '#2a2a40' : ''}">📷 Pindai Soal ${idx + 1} ${nilaiTeks}</button>`;
-            });
-            document.getElementById('modal-pilih-soal').classList.remove('hidden');
-        }
-
-        function picuKamera(qIndex) {
-            scanState.questionIndex = qIndex;
-            document.getElementById('camera-input').click();
-        }
-
-        async function prosesKoreksiAI(event) {
-            const file = event.target.files[0];
-            if(!file) return;
-            if(!appData.apiKey) { alert("API Key belum diatur di menu Pengaturan!"); return; }
-
-            tutupModal('modal-pilih-soal');
-            document.getElementById('ai-modal').classList.remove('hidden');
-            document.getElementById('loading-spinner').classList.remove('hidden');
-            document.getElementById('modal-result').classList.add('hidden');
-            document.getElementById('modal-title-ai').innerText = `Koreksi Soal ${scanState.questionIndex + 1}`;
-
-            try {
-                const ujian = appData.exams.find(x => x.id === scanState.examId);
-                const rubrikSoal = ujian.questions[scanState.questionIndex];
-                
-                let teksRubrik = "";
-                rubrikSoal.forEach((r, i) => teksRubrik += `Langkah ${i+1}: ${r.desc} (Bobot: ${r.point})\n`);
-
-                const prompt = `Anda pemeriksa jawaban ujian. Bandingkan gambar jawaban siswa ini dengan rubrik berikut:\n${teksRubrik}\n\nAturan:\n1. Ekstrak langkah di kertas, cocokkan dengan rubrik.\n2. Beri poin sesuai bobot jika benar, 0 jika salah/hilang.\n3. Format balas persis seperti ini:\n<ul><li>...</li></ul>\nSKOR_AKHIR: [Angka]`;
-
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                    const base64Data = reader.result.split(',')[1];
-                    try {
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appData.apiKey}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType: file.type } }] }] })
-                        });
-                        const data = await response.json();
-                        if(data.error) throw new Error(data.error.message);
-
-                        const parts = data.candidates[0].content.parts[0].text.split('SKOR_AKHIR:');
-                        document.getElementById('ai-analysis').innerHTML = parts[0];
-                        document.getElementById('final-score-val').value = parts.length > 1 ? parseInt(parts[1].trim()) : 0;
-                        document.getElementById('loading-spinner').classList.add('hidden');
-                        document.getElementById('modal-result').classList.remove('hidden');
-                    } catch(e) { alert("Error API: " + e.message); tutupModal('ai-modal'); }
-                };
-                reader.readAsDataURL(file);
-            } catch(e) { alert("Error memproses file."); tutupModal('ai-modal'); }
-        }
-
-        function simpanNilaiAI() {
-            const kelas = appData.classes.find(x => x.id === scanState.classId);
-            const siswa = kelas.students.find(x => x.id === scanState.studentId);
-            
-            if(!siswa.scores[scanState.examId]) siswa.scores[scanState.examId] = {};
-            siswa.scores[scanState.examId][scanState.questionIndex] = parseInt(document.getElementById('final-score-val').value) || 0;
-            
-            saveData(); renderGridPindai(); tutupModal('ai-modal');
-            document.getElementById('camera-input').value = '';
-        }
-
-        // --- EKSPOR EXCEL ---
-        function unduhExcel() {
-            const cid = document.getElementById('pilih-kelas').value;
-            const eid = document.getElementById('pilih-ujian').value;
-            if(!cid || !eid) return alert("Pilih Kelas dan Ujian dulu!");
-            
-            const kelas = appData.classes.find(x => x.id === cid);
-            const ujian = appData.exams.find(x => x.id === eid);
-            
-            // Header CSV (Nama, Soal 1, Soal 2, ..., Total)
-            let csv = "Nama Siswa,";
-            ujian.questions.forEach((_, i) => csv += `Soal ${i+1},`);
-            csv += "Total Nilai\n";
-
-            kelas.students.forEach(s => {
-                csv += `"${s.name}",`;
-                let total = 0;
-                let scores = s.scores[eid] || {};
-                
-                ujian.questions.forEach((_, i) => {
-                    let val = scores[i] !== undefined ? scores[i] : 0;
-                    csv += `${val},`;
-                    total += val;
-                });
-                csv += `${total}\n`;
-            });
-
-            const link = document.createElement("a");
-            link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csv));
-            link.setAttribute("download", `Rekap_${kelas.name}_${ujian.name}.csv`);
-            document.body.appendChild(link);
-            link.click(); document.body.removeChild(link);
-        }
-    </script>
-</body>
-</html>
+            appData.
